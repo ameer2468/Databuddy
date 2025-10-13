@@ -118,7 +118,10 @@ export const redis = getRedisCache();
 let rawRedis: Redis | null = null;
 export const getRawRedis = () => {
 	if (!rawRedis) {
-		rawRedis = new Redis(process.env.REDIS_URL as string);
+		rawRedis = new Redis(process.env.REDIS_URL as string, {
+			...options,
+			maxRetriesPerRequest: null,
+		});
 	}
 	return rawRedis;
 };

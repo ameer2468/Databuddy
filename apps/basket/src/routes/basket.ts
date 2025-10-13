@@ -29,6 +29,8 @@ import {
 	validatePerformanceMetric,
 	validateSessionId,
 } from '../utils/validation';
+import { eventQueue, errorQueue, webVitalsQueue, customEventQueue, outgoingLinkQueue } from '../lib/queue';
+import { logger } from '../lib/logger';
 
 async function getDailySalt(): Promise<string> {
 	const saltKey = `salt:${Math.floor(Date.now() / (24 * 60 * 60 * 1000))}`;
@@ -46,15 +48,30 @@ function saltAnonymousId(anonymousId: string, salt: string): string {
 		.digest('hex');
 }
 
+async function getCachedWebsite(clientId: string): Promise<any> {
+	const cacheKey = `website:${clientId}`;
+	const cached = await redis.get(cacheKey);
+	
+	if (cached) {
+		return JSON.parse(cached);
+	}
+	
+	const website = await getWebsiteByIdV2(clientId);
+	
+	await redis.setex(cacheKey, 300, JSON.stringify(website));
+	
+	return website;
+}
+
 async function validateRequest(body: any, query: any, request: Request) {
 	if (!validatePayloadSize(body, VALIDATION_LIMITS.PAYLOAD_MAX_SIZE)) {
-		await logBlockedTraffic(
+		logBlockedTraffic(
 			request,
 			body,
 			query,
 			'payload_too_large',
 			'Validation Error'
-		);
+		); // Fire and forget
 		return { error: { status: 'error', message: 'Payload too large' } };
 	}
 
@@ -63,17 +80,17 @@ async function validateRequest(body: any, query: any, request: Request) {
 		VALIDATION_LIMITS.SHORT_STRING_MAX_LENGTH
 	);
 	if (!clientId) {
-		await logBlockedTraffic(
+		logBlockedTraffic(
 			request,
 			body,
 			query,
 			'missing_client_id',
 			'Validation Error'
-		);
+		); // Fire and forget
 		return { error: { status: 'error', message: 'Missing client ID' } };
 	}
 
-	const website = await getWebsiteByIdV2(clientId);
+	const website = await getCachedWebsite(clientId);
 	if (!website || website.status !== 'ACTIVE') {
 		await logBlockedTraffic(
 			request,
@@ -97,7 +114,7 @@ async function validateRequest(body: any, query: any, request: Request) {
 		});
 
 		if (!data?.allowed) {
-			await logBlockedTraffic(
+			logBlockedTraffic(
 				request,
 				body,
 				query,
@@ -141,16 +158,16 @@ async function validateRequest(body: any, query: any, request: Request) {
 	};
 }
 
-async function checkForBot(
+function checkForBot(
 	request: Request,
 	body: any,
 	query: any,
 	clientId: string,
 	userAgent: string
-): Promise<{ error?: { status: string } } | null> {
+): { error?: { status: string } } | null {
 	const botCheck = detectBot(userAgent, request);
 	if (botCheck.isBot) {
-		await logBlockedTraffic(
+		logBlockedTraffic(
 			request,
 			body,
 			query,
@@ -158,7 +175,7 @@ async function checkForBot(
 			botCheck.category || 'Bot Detection',
 			botCheck.botName,
 			clientId
-		);
+		); // Fire and forget
 		return { error: { status: 'ignored' } };
 	}
 	return null;
@@ -228,19 +245,7 @@ async function insertError(
 		created_at: now,
 	};
 
-	try {
-		await clickHouse.insert({
-			table: 'analytics.errors',
-			values: [errorEvent],
-			format: 'JSONEachRow',
-		});
-	} catch (err) {
-		// logger.error('Failed to insert error event', {
-		// 	error: err as Error,
-		// 	eventId,
-		// });
-		throw err;
-	}
+	await errorQueue.add('error', errorEvent);
 }
 
 async function insertWebVitals(
@@ -296,19 +301,7 @@ async function insertWebVitals(
 		created_at: now,
 	};
 
-	try {
-		await clickHouse.insert({
-			table: 'analytics.web_vitals',
-			values: [webVitalsEvent],
-			format: 'JSONEachRow',
-		});
-	} catch (err) {
-		// logger.error('Failed to insert web vitals event', {
-		// 	error: err as Error,
-		// 	eventId,
-		// });
-		throw err;
-	}
+	await webVitalsQueue.add('web_vitals', webVitalsEvent);
 }
 
 async function insertCustomEvent(
@@ -351,15 +344,7 @@ async function insertCustomEvent(
 			typeof customData.timestamp === 'number' ? customData.timestamp : now,
 	};
 
-	try {
-		await clickHouse.insert({
-			table: 'analytics.custom_events',
-			values: [customEvent],
-			format: 'JSONEachRow',
-		});
-	} catch (err) {
-		throw err;
-	}
+	await customEventQueue.add('custom', customEvent);
 }
 
 async function insertOutgoingLink(
@@ -400,22 +385,10 @@ async function insertOutgoingLink(
 			typeof linkData.timestamp === 'number' ? linkData.timestamp : now,
 	};
 
-	try {
-		await clickHouse.insert({
-			table: 'analytics.outgoing_links',
-			values: [outgoingLinkEvent],
-			format: 'JSONEachRow',
-		});
-	} catch (err) {
-		// logger.error('Failed to insert outgoing link event', {
-		// 	error: err as Error,
-		// 	eventId,
-		// });
-		throw err;
-	}
+	await outgoingLinkQueue.add('outgoing_link', outgoingLinkEvent);
 }
 
-async function insertTrackEvent(
+async function queueTrackEvent(
 	trackData: any,
 	clientId: string,
 	userAgent: string,
@@ -525,19 +498,14 @@ async function insertTrackEvent(
 		created_at: now,
 	};
 
-	try {
-		await clickHouse.insert({
-			table: 'analytics.events',
-			values: [trackEvent],
-			format: 'JSONEachRow',
-		});
-	} catch (err) {
-		// logger.error('Failed to insert track event', {
-		// 	error: err as Error,
-		// 	eventId,
-		// });
-		throw err;
-	}
+	await eventQueue.add('track', trackEvent);
+	
+	logger.debug({
+		message: 'Track event queued',
+		eventId: trackEvent.event_id,
+		clientId: trackEvent.client_id,
+		eventName: trackEvent.event_name,
+	});
 }
 
 async function checkDuplicate(
@@ -636,18 +604,25 @@ async function logBlockedTraffic(
 				format: 'JSONEachRow',
 			})
 			.then(() => {
-				// logger.info(
-				//	`Logged blocked traffic, origin: ${blockedEvent.origin}, reason: ${blockedEvent.block_reason}, category: ${blockedEvent.block_category}`,
-					// { blockedEvent }
-				// );
+				logger.info({
+					message: 'Blocked traffic logged',
+					origin: blockedEvent.origin,
+					reason: blockedEvent.block_reason,
+					category: blockedEvent.block_category,
+					clientId: blockedEvent.client_id,
+				});
 			})
 			.catch((err) => {
-				// logger.error('Failed to log blocked traffic', { error: err as Error });
-				throw err;
+				logger.error({
+					message: 'Failed to log blocked traffic',
+					error: err instanceof Error ? err.message : String(err),
+				});
 			});
 	} catch (error) {
-		// logger.error('Failed to log blocked traffic', { error: error as Error });
-		throw error;
+		logger.error({
+			message: 'Failed to log blocked traffic',
+			error: error instanceof Error ? error.message : String(error),
+		});
 	}
 }
 
@@ -679,7 +654,7 @@ const app = new Elysia()
 
 			if (eventType === 'track') {
 				// Check for bots before processing track events
-				const botError = await checkForBot(
+				const botError = checkForBot(
 					request,
 					body,
 					query,
@@ -692,12 +667,12 @@ const app = new Elysia()
 
 				const parseResult = analyticsEventSchema.safeParse(body);
 				if (!parseResult.success) {
-					console.error(
-						'Blocked event schema errors:',
-						parseResult.error.issues,
-						'Payload:',
-						body
-					);
+					logger.error({
+	message: 'Track event schema validation failed',
+						clientId,
+						errors: parseResult.error.issues,
+						eventType: 'track',
+					});
 					await logBlockedTraffic(
 						request,
 						body,
@@ -713,8 +688,11 @@ const app = new Elysia()
 						errors: parseResult.error.issues,
 					};
 				}
-				insertTrackEvent(body, clientId, userAgent, ip);
-				return { status: 'success', type: 'track' };
+		queueTrackEvent(body, clientId, userAgent, ip); // Fire and forget
+		return new Response(JSON.stringify({ success: true }), { 
+			status: 200,
+			headers: { 'Content-Type': 'application/json' }
+		});
 			}
 
 			if (eventType === 'error') {
@@ -722,7 +700,7 @@ const app = new Elysia()
 					return { status: 'ignored', type: 'error', reason: 'filtered_message' };
 				}
 
-				const botError = await checkForBot(
+				const botError = checkForBot(
 					request,
 					body,
 					query,
@@ -735,12 +713,12 @@ const app = new Elysia()
 
 				const parseResult = errorEventSchema.safeParse(body);
 				if (!parseResult.success) {
-					console.error(
-						'Blocked event schema errors:',
-						parseResult.error.issues,
-						'Payload:',
-						body
-					);
+					logger.error({
+	message: 'Error event schema validation failed',
+						clientId,
+						errors: parseResult.error.issues,
+						eventType: 'error',
+					});
 					await logBlockedTraffic(
 						request,
 						body,
@@ -756,13 +734,16 @@ const app = new Elysia()
 						errors: parseResult.error.issues,
 					};
 				}
-				insertError(body, clientId, userAgent, ip);
-				return { status: 'success', type: 'error' };
+				insertError(body, clientId, userAgent, ip); // Fire and forget
+				return new Response(JSON.stringify({ success: true }), { 
+					status: 200,
+					headers: { 'Content-Type': 'application/json' }
+				});
 			}
 
 			if (eventType === 'web_vitals') {
 				// Check for bots before processing web vitals events
-				const botError = await checkForBot(
+				const botError = checkForBot(
 					request,
 					body,
 					query,
@@ -775,12 +756,12 @@ const app = new Elysia()
 
 				const parseResult = webVitalsEventSchema.safeParse(body);
 				if (!parseResult.success) {
-					console.error(
-						'Blocked event schema errors:',
-						parseResult.error.issues,
-						'Payload:',
-						body
-					);
+					logger.error({
+	message: 'Web vitals event schema validation failed',
+						clientId,
+						errors: parseResult.error.issues,
+						eventType: 'web_vitals',
+					});
 					await logBlockedTraffic(
 						request,
 						body,
@@ -796,19 +777,22 @@ const app = new Elysia()
 						errors: parseResult.error.issues,
 					};
 				}
-				insertWebVitals(body, clientId, userAgent, ip);
-				return { status: 'success', type: 'web_vitals' };
+				insertWebVitals(body, clientId, userAgent, ip); // Fire and forget
+				return new Response(JSON.stringify({ success: true }), { 
+					status: 200,
+					headers: { 'Content-Type': 'application/json' }
+				});
 			}
 
 			if (eventType === 'custom') {
 				const parseResult = customEventSchema.safeParse(body);
 				if (!parseResult.success) {
-					console.error(
-						'Blocked event schema errors:',
-						parseResult.error.issues,
-						'Payload:',
-						body
-					);
+					logger.error({
+	message: 'Custom event schema validation failed',
+						clientId,
+						errors: parseResult.error.issues,
+						eventType: 'custom',
+					});
 					await logBlockedTraffic(
 						request,
 						body,
@@ -828,12 +812,15 @@ const app = new Elysia()
 				const eventId = body.eventId || randomUUID();
 				const customEventWithId = { ...body, eventId };
 
-				await insertCustomEvent(customEventWithId, clientId, userAgent, ip);
-				return { status: 'success', type: 'custom', eventId };
+				insertCustomEvent(customEventWithId, clientId, userAgent, ip); // Fire and forget
+				return new Response(JSON.stringify({ success: true }), { 
+					status: 200,
+					headers: { 'Content-Type': 'application/json' }
+				});
 			}
 
 			if (eventType === 'outgoing_link') {
-				const botError = await checkForBot(
+				const botError = checkForBot(
 					request,
 					body,
 					query,
@@ -846,12 +833,12 @@ const app = new Elysia()
 
 				const parseResult = outgoingLinkSchema.safeParse(body);
 				if (!parseResult.success) {
-					console.error(
-						'Blocked event schema errors:',
-						parseResult.error.issues,
-						'Payload:',
-						body
-					);
+					logger.error({
+	message: 'Outgoing link event schema validation failed',
+						clientId,
+						errors: parseResult.error.issues,
+						eventType: 'outgoing_link',
+					});
 					await logBlockedTraffic(
 						request,
 						body,
@@ -867,8 +854,11 @@ const app = new Elysia()
 						errors: parseResult.error.issues,
 					};
 				}
-				insertOutgoingLink(body, clientId, userAgent, ip);
-				return { status: 'success', type: 'outgoing_link' };
+				insertOutgoingLink(body, clientId, userAgent, ip); // Fire and forget
+				return new Response(JSON.stringify({ success: true }), { 
+					status: 200,
+					headers: { 'Content-Type': 'application/json' }
+				});
 			}
 
 			return { status: 'error', message: 'Unknown event type' };
@@ -916,7 +906,7 @@ const app = new Elysia()
 
 				if (eventType === 'track') {
 					// Check for bots before processing track events
-					const botError = await checkForBot(
+					const botError = checkForBot(
 						request,
 						event,
 						query,
@@ -934,12 +924,13 @@ const app = new Elysia()
 
 					const parseResult = analyticsEventSchema.safeParse(event);
 					if (!parseResult.success) {
-						console.error(
-							'Blocked event schema errors:',
-							parseResult.error.issues,
-							'Payload:',
-							event
-						);
+						logger.error({
+	message: 'Batch track event schema validation failed',
+							clientId,
+							errors: parseResult.error.issues,
+							eventType: 'track',
+							batchIndex: body.indexOf(event),
+						});
 						await logBlockedTraffic(
 							request,
 							event,
@@ -958,12 +949,11 @@ const app = new Elysia()
 						};
 					}
 					try {
-						await insertTrackEvent(event, clientId, userAgent, ip);
-						return {
-							status: 'success',
-							type: 'track',
-							eventId: event.eventId,
-						};
+						queueTrackEvent(event, clientId, userAgent, ip); // Fire and forget
+						return new Response(JSON.stringify({ success: true }), { 
+					status: 200,
+					headers: { 'Content-Type': 'application/json' }
+				});
 					} catch (error) {
 						return {
 							status: 'error',
@@ -984,7 +974,7 @@ const app = new Elysia()
 					}
 
 					// Check for bots before processing error events
-					const botError = await checkForBot(
+					const botError = checkForBot(
 						request,
 						event,
 						query,
@@ -1002,12 +992,13 @@ const app = new Elysia()
 
 					const parseResult = errorEventSchema.safeParse(event);
 					if (!parseResult.success) {
-						console.error(
-							'Blocked event schema errors:',
-							parseResult.error.issues,
-							'Payload:',
-							event
-						);
+						logger.error({
+	message: 'Batch error event schema validation failed',
+							clientId,
+							errors: parseResult.error.issues,
+							eventType: 'error',
+							batchIndex: body.indexOf(event),
+						});
 						await logBlockedTraffic(
 							request,
 							event,
@@ -1026,12 +1017,11 @@ const app = new Elysia()
 						};
 					}
 					try {
-						await insertError(event, clientId, userAgent, ip);
-						return {
-							status: 'success',
-							type: 'error',
-							eventId: event.payload?.eventId,
-						};
+						insertError(event, clientId, userAgent, ip); // Fire and forget
+						return new Response(JSON.stringify({ success: true }), { 
+					status: 200,
+					headers: { 'Content-Type': 'application/json' }
+				});
 					} catch (error) {
 						return {
 							status: 'error',
@@ -1043,7 +1033,7 @@ const app = new Elysia()
 				}
 				if (eventType === 'web_vitals') {
 					// Check for bots before processing web vitals events
-					const botError = await checkForBot(
+					const botError = checkForBot(
 						request,
 						event,
 						query,
@@ -1061,12 +1051,13 @@ const app = new Elysia()
 
 					const parseResult = webVitalsEventSchema.safeParse(event);
 					if (!parseResult.success) {
-						console.error(
-							'Blocked event schema errors:',
-							parseResult.error.issues,
-							'Payload:',
-							event
-						);
+						logger.error({
+	message: 'Batch web vitals event schema validation failed',
+							clientId,
+							errors: parseResult.error.issues,
+							eventType: 'web_vitals',
+							batchIndex: body.indexOf(event),
+						});
 						await logBlockedTraffic(
 							request,
 							event,
@@ -1085,12 +1076,11 @@ const app = new Elysia()
 						};
 					}
 					try {
-						await insertWebVitals(event, clientId, userAgent, ip);
-						return {
-							status: 'success',
-							type: 'web_vitals',
-							eventId: event.payload?.eventId,
-						};
+						insertWebVitals(event, clientId, userAgent, ip); // Fire and forget
+						return new Response(JSON.stringify({ success: true }), { 
+					status: 200,
+					headers: { 'Content-Type': 'application/json' }
+				});
 					} catch (error) {
 						return {
 							status: 'error',
@@ -1103,12 +1093,13 @@ const app = new Elysia()
 				if (eventType === 'custom') {
 					const parseResult = customEventSchema.safeParse(event);
 					if (!parseResult.success) {
-						console.error(
-							'Blocked event schema errors:',
-							parseResult.error.issues,
-							'Payload:',
-							event
-						);
+						logger.error({
+	message: 'Batch custom event schema validation failed',
+							clientId,
+							errors: parseResult.error.issues,
+							eventType: 'custom',
+							batchIndex: body.indexOf(event),
+						});
 						await logBlockedTraffic(
 							request,
 							event,
@@ -1131,12 +1122,11 @@ const app = new Elysia()
 						const eventId = event.eventId || randomUUID();
 						const customEventWithId = { ...event, eventId };
 
-						await insertCustomEvent(customEventWithId, clientId, userAgent, ip);
-						return {
-							status: 'success',
-							type: 'custom',
-							eventId,
-						};
+						insertCustomEvent(customEventWithId, clientId, userAgent, ip); // Fire and forget
+						return new Response(JSON.stringify({ success: true }), { 
+					status: 200,
+					headers: { 'Content-Type': 'application/json' }
+				});
 					} catch (error) {
 						return {
 							status: 'error',
@@ -1148,7 +1138,7 @@ const app = new Elysia()
 				}
 				if (eventType === 'outgoing_link') {
 					// Check for bots before processing outgoing link events
-					const botError = await checkForBot(
+					const botError = checkForBot(
 						request,
 						event,
 						query,
@@ -1166,12 +1156,13 @@ const app = new Elysia()
 
 					const parseResult = outgoingLinkSchema.safeParse(event);
 					if (!parseResult.success) {
-						console.error(
-							'Blocked event schema errors:',
-							parseResult.error.issues,
-							'Payload:',
-							event
-						);
+						logger.error({
+	message: 'Batch outgoing link event schema validation failed',
+							clientId,
+							errors: parseResult.error.issues,
+							eventType: 'outgoing_link',
+							batchIndex: body.indexOf(event),
+						});
 						await logBlockedTraffic(
 							request,
 							event,
@@ -1190,12 +1181,11 @@ const app = new Elysia()
 						};
 					}
 					try {
-						await insertOutgoingLink(event, clientId, userAgent, ip);
-						return {
-							status: 'success',
-							type: 'outgoing_link',
-							eventId: event.eventId,
-						};
+						insertOutgoingLink(event, clientId, userAgent, ip); // Fire and forget
+						return new Response(JSON.stringify({ success: true }), { 
+					status: 200,
+					headers: { 'Content-Type': 'application/json' }
+				});
 					} catch (error) {
 						return {
 							status: 'error',
@@ -1214,12 +1204,10 @@ const app = new Elysia()
 
 			results.push(...(await Promise.all(processingPromises)));
 
-			return {
-				status: 'success',
-				batch: true,
-				processed: results.length,
-				results,
-			};
+			return new Response(JSON.stringify({ success: true }), { 
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			});
 		}
 	);
 

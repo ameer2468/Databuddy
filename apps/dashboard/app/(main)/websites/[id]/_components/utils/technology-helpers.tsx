@@ -156,7 +156,6 @@ export const TechnologyIcon = ({
 		return <>{entry.iconComponent}</>;
 	}
 
-	// Use unified icon components for better consistency
 	if (entry.category === 'browser') {
 		return <BrowserIcon name={entry.name} size={size} />;
 	}
@@ -165,7 +164,6 @@ export const TechnologyIcon = ({
 		return <OSIcon name={entry.name} size={size} />;
 	}
 
-	// Fallback for other categories or when no category is specified
 	if (entry.icon) {
 		const sizeMap = {
 			sm: 12,

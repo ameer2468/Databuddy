@@ -127,7 +127,6 @@ function planToOffer(plan: RawPlan, baseUrl: string) {
 				}
 			}
 		}
-		// Other priced features (e.g., extra websites per month)
 		else if (typeof pf.price === 'number') {
 			const refUnit = toUnitCode(pf.interval);
 			priceSpecs.push({
