@@ -1,0 +1,875 @@
+---
+title: AI SDK Integration
+description: Track AI model usage, token consumption, and costs with Databuddy's Vercel AI SDK integration
+---
+
+import { Tab, Tabs } from "@/components/docs";
+import { Callout } from "@/components/docs";
+import { Card, Cards } from "@/components/docs";
+import { CodeBlock } from "@/components/docs";
+
+The Databuddy AI SDK integration provides automatic tracking for AI model usage, token consumption, and cost analysis when using the [Vercel AI SDK](https://sdk.vercel.ai/docs). Monitor your AI application's performance, optimize costs, and understand usage patterns.
+
+<Callout type="info">
+  **SDK Version**: 2.0.0+ | **Compatible with**: Vercel AI SDK v4.0.0+ | **Package**: `@databuddy/sdk`
+</Callout>
+
+## Overview
+
+The AI SDK integration automatically tracks:
+
+- **Token Usage**: Input, output, and cached token counts
+- **Cost Tracking**: Real-time cost calculation for input/output tokens in USD
+- **Model Information**: Track which models are being used
+- **Tool Calls**: Monitor AI tool/function usage
+- **Completion Metadata**: Finish reasons and response characteristics
+
+All tracking is done transparently through middleware - your AI code stays clean and focused on functionality.
+
+## Installation
+
+<Tabs items={['Bun', 'npm', 'pnpm', 'yarn']}>
+<Tab value="Bun">
+
+```bash
+bun add @databuddy/sdk ai @ai-sdk/provider
+```
+
+</Tab>
+<Tab value="npm">
+
+```bash
+npm install @databuddy/sdk ai @ai-sdk/provider
+```
+
+</Tab>
+<Tab value="pnpm">
+
+```bash
+pnpm add @databuddy/sdk ai @ai-sdk/provider
+```
+
+</Tab>
+<Tab value="yarn">
+
+```bash
+yarn add @databuddy/sdk ai @ai-sdk/provider
+```
+
+</Tab>
+</Tabs>
+
+<Callout type="warn">
+**Important**: You also need to install your AI provider's SDK (e.g., `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`, etc.)
+</Callout>
+
+## Quick Start
+
+### Basic Usage with OpenAI
+
+```typescript
+import { Databuddy } from '@databuddy/sdk/node';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+const model = withBuddy(
+  openai('gpt-4-turbo'),
+  buddy
+);
+
+const result = await generateText({
+  model,
+  prompt: 'Explain quantum computing in simple terms'
+});
+
+console.log(result.text);
+await buddy.flush();
+```
+
+That's it! Every AI generation is now automatically tracked with token usage and cost information.
+
+## Supported AI Providers
+
+The integration works with all Vercel AI SDK providers:
+
+<Tabs items={['OpenAI', 'Anthropic', 'Google', 'Azure', 'Custom']}>
+<Tab value="OpenAI">
+
+```typescript
+import { openai } from '@ai-sdk/openai';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { Databuddy } from '@databuddy/sdk/node';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+const model = withBuddy(openai('gpt-4o'), buddy);
+const result = await generateText({
+  model,
+  prompt: 'Write a haiku about coding'
+});
+```
+
+**Supported Models**: `gpt-4o`, `gpt-4-turbo`, `gpt-3.5-turbo`, `o1-preview`, `o1-mini`, and more.
+
+</Tab>
+<Tab value="Anthropic">
+
+```typescript
+import { anthropic } from '@ai-sdk/anthropic';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { Databuddy } from '@databuddy/sdk/node';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+const model = withBuddy(
+  anthropic('claude-3-5-sonnet-20241022'),
+  buddy
+);
+
+const result = await generateText({
+  model,
+  prompt: 'Explain machine learning'
+});
+```
+
+**Supported Models**: `claude-3-5-sonnet-20241022`, `claude-3-opus-20240229`, `claude-3-sonnet-20240229`, and more.
+
+</Tab>
+<Tab value="Google">
+
+```typescript
+import { google } from '@ai-sdk/google';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { Databuddy } from '@databuddy/sdk/node';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+const model = withBuddy(
+  google('gemini-1.5-pro'),
+  buddy
+);
+
+const result = await generateText({
+  model,
+  prompt: 'Summarize this article'
+});
+```
+
+**Supported Models**: `gemini-1.5-pro`, `gemini-1.5-flash`, `gemini-pro`, and more.
+
+</Tab>
+<Tab value="Azure">
+
+```typescript
+import { azure } from '@ai-sdk/azure';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { Databuddy } from '@databuddy/sdk/node';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+const model = withBuddy(
+  azure('my-gpt-4-deployment'),
+  buddy
+);
+
+const result = await generateText({
+  model,
+  prompt: 'Analyze this data'
+});
+```
+
+</Tab>
+<Tab value="Custom">
+
+```typescript
+import { createOpenAI } from '@ai-sdk/openai';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { Databuddy } from '@databuddy/sdk/node';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+const customProvider = createOpenAI({
+  baseURL: 'https://api.custom-provider.com/v1',
+  apiKey: process.env.CUSTOM_API_KEY
+});
+
+const model = withBuddy(
+  customProvider('custom-model'),
+  buddy
+);
+```
+
+Works with any provider implementing the Vercel AI SDK interface.
+
+</Tab>
+</Tabs>
+
+## API Reference
+
+### `withBuddy(model, buddy)`
+
+Wraps a Vercel AI SDK language model with Databuddy tracking middleware.
+
+**Parameters:**
+
+- `model` (`LanguageModelV2`): The language model to wrap
+  - Must be a model instance from AI SDK (e.g., `openai('gpt-4')`)
+  - **Important**: Use the model instance, not the string ID
+- `buddy` (`Databuddy`): Your Databuddy client instance
+
+**Returns:** `LanguageModelV2` - The wrapped model with tracking enabled
+
+**Example:**
+
+```typescript
+import { Databuddy } from '@databuddy/sdk/node';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { openai } from '@ai-sdk/openai';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+const model = withBuddy(openai('gpt-4-turbo'), buddy);
+```
+
+<Callout type="warn">
+**AI Gateway Users**: If using Vercel AI Gateway, pass the gateway model directly:
+
+```typescript
+import { gateway } from '@ai-sdk/gateway';
+
+const model = withBuddy(
+  gateway('xai/grok-3'),
+  buddy
+);
+```
+</Callout>
+
+## Tracked Event: `ai.generate`
+
+Every AI generation automatically tracks an `ai.generate` event with the following properties:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `inputTokens` | `number` | Number of tokens in the prompt |
+| `outputTokens` | `number` | Number of tokens in the completion |
+| `totalTokens` | `number` | Total tokens used (input + output) |
+| `cachedInputTokens` | `number \| undefined` | Number of cached input tokens (if supported) |
+| `finishReason` | `string` | Why generation stopped (`stop`, `length`, `tool-calls`, etc.) |
+| `toolCallCount` | `number` | Number of tool/function calls made |
+| `toolResultCount` | `number` | Number of tool results received |
+| `toolCallNames` | `string[]` | Names of tools/functions called |
+| `inputTokenCostUSD` | `number` | Cost of input tokens in USD |
+| `outputTokenCostUSD` | `number` | Cost of output tokens in USD |
+| `totalTokenCostUSD` | `number` | Total cost in USD |
+
+<Callout type="info">
+**Cost Calculation**: Costs are calculated using the [tokenlens](https://github.com/friendliai/tokenlens) library, which provides real-time pricing data for major AI providers.
+</Callout>
+
+## Usage Examples
+
+### Text Generation
+
+```typescript
+import { Databuddy } from '@databuddy/sdk/node';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+const model = withBuddy(openai('gpt-4-turbo'), buddy);
+
+const result = await generateText({
+  model,
+  prompt: 'Write a product description for wireless headphones'
+});
+
+console.log(result.text);
+
+await buddy.flush();
+```
+
+### Streaming Responses
+
+```typescript
+import { Databuddy } from '@databuddy/sdk/node';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { openai } from '@ai-sdk/openai';
+import { streamText } from 'ai';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+const model = withBuddy(openai('gpt-4-turbo'), buddy);
+
+const result = streamText({
+  model,
+  prompt: 'Write a story about a robot'
+});
+
+for await (const chunk of result.textStream) {
+  process.stdout.write(chunk);
+}
+
+await buddy.flush();
+```
+
+<Callout type="info">
+Token usage and costs are tracked when the stream completes.
+</Callout>
+
+### Tool/Function Calling
+
+```typescript
+import { Databuddy } from '@databuddy/sdk/node';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
+import { z } from 'zod';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+const model = withBuddy(openai('gpt-4-turbo'), buddy);
+
+const result = await generateText({
+  model,
+  prompt: 'What is the weather in San Francisco?',
+  tools: {
+    getWeather: {
+      description: 'Get the current weather for a location',
+      parameters: z.object({
+        city: z.string().describe('The city name')
+      }),
+      execute: async ({ city }) => {
+        return { temperature: 72, condition: 'Sunny' };
+      }
+    }
+  }
+});
+
+await buddy.flush();
+```
+
+The tracked event will include:
+- `toolCallCount: 1`
+- `toolCallNames: ['getWeather']`
+- `toolResultCount: 1`
+
+### Multi-Turn Conversations
+
+```typescript
+import { Databuddy } from '@databuddy/sdk/node';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!,
+  enableBatching: true
+});
+
+const model = withBuddy(openai('gpt-4-turbo'), buddy);
+
+const messages = [
+  { role: 'user', content: 'Hello!' },
+  { role: 'assistant', content: 'Hi! How can I help you?' },
+  { role: 'user', content: 'Tell me a joke' }
+];
+
+const result = await generateText({
+  model,
+  messages
+});
+
+console.log(result.text);
+
+await buddy.flush();
+```
+
+Each generation in the conversation is tracked separately with its own token usage and costs.
+
+## Framework Integrations
+
+### Next.js App Router
+
+```typescript title="app/api/chat/route.ts"
+import { Databuddy } from '@databuddy/sdk/node';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { openai } from '@ai-sdk/openai';
+import { streamText } from 'ai';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+  
+  const model = withBuddy(openai('gpt-4-turbo'), buddy);
+  
+  const result = streamText({
+    model,
+    messages
+  });
+  
+  return result.toDataStreamResponse();
+}
+```
+
+### Next.js API Routes (Pages Router)
+
+```typescript title="pages/api/generate.ts"
+import { Databuddy } from '@databuddy/sdk/node';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
+import type { NextApiRequest, NextApiResponse } from 'next';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const { prompt } = req.body;
+  
+  const model = withBuddy(openai('gpt-4-turbo'), buddy);
+  
+  const result = await generateText({
+    model,
+    prompt
+  });
+  
+  await buddy.flush();
+  
+  res.json({ text: result.text });
+}
+```
+
+### Express.js
+
+```typescript
+import express from 'express';
+import { Databuddy } from '@databuddy/sdk/node';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
+
+const app = express();
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+app.post('/api/generate', async (req, res) => {
+  const { prompt } = req.body;
+  
+  const model = withBuddy(openai('gpt-4-turbo'), buddy);
+  
+  const result = await generateText({
+    model,
+    prompt
+  });
+  
+  await buddy.flush();
+  
+  res.json({ text: result.text });
+});
+
+app.listen(3000);
+```
+
+### AWS Lambda
+
+```typescript
+import { Databuddy } from '@databuddy/sdk/node';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!,
+  enableBatching: true
+});
+
+export const handler = async (event: any) => {
+  const { prompt } = JSON.parse(event.body);
+  
+  const model = withBuddy(openai('gpt-4-turbo'), buddy);
+  
+  const result = await generateText({
+    model,
+    prompt
+  });
+  
+  await buddy.flush();
+  
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ text: result.text })
+  };
+};
+```
+
+<Callout type="warn">
+**Serverless Reminder**: Always call `await buddy.flush()` before your function exits to ensure events are sent.
+</Callout>
+
+## Advanced Usage
+
+### Multiple Models
+
+Track multiple AI models independently:
+
+```typescript
+import { Databuddy } from '@databuddy/sdk/node';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { openai } from '@ai-sdk/openai';
+import { anthropic } from '@ai-sdk/anthropic';
+import { generateText } from 'ai';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+const gpt4 = withBuddy(openai('gpt-4-turbo'), buddy);
+const claude = withBuddy(anthropic('claude-3-5-sonnet-20241022'), buddy);
+
+const result1 = await generateText({
+  model: gpt4,
+  prompt: 'Explain AI to a 5-year-old'
+});
+
+const result2 = await generateText({
+  model: claude,
+  prompt: 'Explain AI to a 5-year-old'
+});
+
+await buddy.flush();
+```
+
+Both models are tracked with their respective costs and token usage.
+
+### Custom Event Properties
+
+Add custom properties to AI tracking events:
+
+```typescript
+import { Databuddy } from '@databuddy/sdk/node';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+buddy.setGlobalProperties({
+  environment: 'production',
+  feature: 'chat',
+  user_tier: 'premium'
+});
+
+const model = withBuddy(openai('gpt-4-turbo'), buddy);
+
+const result = await generateText({
+  model,
+  prompt: 'Hello'
+});
+
+await buddy.flush();
+```
+
+The `ai.generate` event will include your custom properties alongside token and cost data.
+
+### Session Tracking
+
+Track AI usage per user session:
+
+```typescript
+import { Databuddy } from '@databuddy/sdk/node';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+const sessionId = 'sess_' + userId;
+const anonymousId = 'anon_' + userId;
+
+buddy.setGlobalProperties({
+  sessionId,
+  anonymousId,
+  user_id: userId
+});
+
+const model = withBuddy(openai('gpt-4-turbo'), buddy);
+
+const result = await generateText({
+  model,
+  prompt: 'Hello'
+});
+
+await buddy.flush();
+```
+
+Now you can analyze AI usage per user and per session in your Databuddy dashboard.
+
+### Error Handling
+
+```typescript
+import { Databuddy } from '@databuddy/sdk/node';
+import { withBuddy } from '@databuddy/sdk/ai';
+import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
+
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+const model = withBuddy(openai('gpt-4-turbo'), buddy);
+
+try {
+  const result = await generateText({
+    model,
+    prompt: 'Hello',
+    maxTokens: 10
+  });
+  
+  console.log(result.text);
+} catch (error) {
+  await buddy.track({
+    name: 'ai.error',
+    properties: {
+      error: error.message,
+      model: 'gpt-4-turbo'
+    }
+  });
+} finally {
+  await buddy.flush();
+}
+```
+
+## Cost Optimization
+
+Use Databuddy's AI tracking to optimize your AI costs:
+
+### 1. Monitor Token Usage
+
+Track which prompts use the most tokens:
+
+```typescript
+const result = await generateText({
+  model: withBuddy(openai('gpt-4-turbo'), buddy),
+  prompt: longPrompt
+});
+
+console.log(`Tokens used: ${result.usage.totalTokens}`);
+console.log(`Cost: $${result.usage.totalTokens * 0.00001}`);
+```
+
+Review in Databuddy dashboard to identify expensive prompts.
+
+### 2. Compare Model Costs
+
+Test different models and compare costs:
+
+```typescript
+const models = [
+  { name: 'gpt-4-turbo', model: openai('gpt-4-turbo') },
+  { name: 'gpt-3.5-turbo', model: openai('gpt-3.5-turbo') },
+  { name: 'claude-3-haiku', model: anthropic('claude-3-haiku-20240307') }
+];
+
+for (const { name, model } of models) {
+  const wrapped = withBuddy(model, buddy);
+  
+  await generateText({
+    model: wrapped,
+    prompt: 'Test prompt'
+  });
+}
+
+await buddy.flush();
+```
+
+Use Databuddy analytics to compare costs across models.
+
+### 3. Track Cost by Feature
+
+```typescript
+const features = ['chat', 'summarization', 'translation'];
+
+for (const feature of features) {
+  buddy.setGlobalProperties({ feature });
+  
+  const model = withBuddy(openai('gpt-4-turbo'), buddy);
+  
+  await generateText({
+    model,
+    prompt: featurePrompts[feature]
+  });
+}
+
+await buddy.flush();
+```
+
+Analyze which features consume the most AI credits.
+
+## Best Practices
+
+### 1. Always Flush in Serverless
+
+```typescript
+export const handler = async (event: any) => {
+  const model = withBuddy(openai('gpt-4-turbo'), buddy);
+  await generateText({ model, prompt: 'Hello' });
+  
+  await buddy.flush();
+  
+  return { statusCode: 200 };
+};
+```
+
+### 2. Enable Batching for High Volume
+
+```typescript
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!,
+  enableBatching: true,
+  batchSize: 50,
+  batchTimeout: 5000
+});
+```
+
+### 3. Use Environment Variables
+
+```bash title=".env"
+DATABUDDY_CLIENT_ID=your-client-id
+OPENAI_API_KEY=your-openai-key
+ANTHROPIC_API_KEY=your-anthropic-key
+```
+
+```typescript
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+```
+
+### 4. Add Context with Global Properties
+
+```typescript
+buddy.setGlobalProperties({
+  environment: process.env.NODE_ENV,
+  version: process.env.APP_VERSION,
+  region: process.env.AWS_REGION
+});
+```
+
+### 5. Monitor Tool Usage
+
+```typescript
+const result = await generateText({
+  model: withBuddy(openai('gpt-4-turbo'), buddy),
+  prompt: 'What is the weather?',
+  tools: { getWeather, getForecast, getAlerts }
+});
+
+console.log(`Tools called: ${result.toolCalls.length}`);
+```
+
+Track which AI tools are used most frequently.
+
+## TypeScript Support
+
+The AI SDK integration is fully typed:
+
+```typescript
+import { Databuddy } from '@databuddy/sdk/node';
+import { withBuddy } from '@databuddy/sdk/ai';
+import type { LanguageModelV2 } from '@ai-sdk/provider';
+
+const buddy: Databuddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!
+});
+
+const model: LanguageModelV2 = withBuddy(
+  openai('gpt-4-turbo'),
+  buddy
+);
+```
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Events not appearing | Verify `clientId`, check `debug: true` in Databuddy config |
+| Wrong model costs | Ensure using latest `tokenlens` version |
+| Missing tool call data | Verify you're using AI SDK v4.0.0+ |
+| TypeScript errors | Ensure `@ai-sdk/provider` is installed |
+| Gateway models not working | Pass `gateway('provider/model')` instance, not string |
+
+## Debugging
+
+Enable debug logging:
+
+```typescript
+const buddy = new Databuddy({
+  clientId: process.env.DATABUDDY_CLIENT_ID!,
+  debug: true
+});
+
+const model = withBuddy(openai('gpt-4-turbo'), buddy);
+
+const result = await generateText({
+  model,
+  prompt: 'Test'
+});
+
+await buddy.flush();
+```
+
+Check console output for tracking events and API requests.
+
+## Related Documentation
+
+<Cards>
+  <Card title="Node SDK" href="/docs/node-sdk" icon="📦">
+    Server-side analytics tracking with Node.js
+  </Card>
+  <Card title="Web SDK" href="/docs/sdk" icon="🌐">
+    Client-side tracking with React, Vue, and vanilla JavaScript
+  </Card>
+  <Card title="Getting Started" href="/docs/getting-started" icon="🚀">
+    Quick setup guide and basic configuration
+  </Card>
+  <Card title="API Reference" href="/docs/api" icon="📡">
+    Direct HTTP API for custom implementations
+  </Card>
+</Cards>
