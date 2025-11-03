@@ -277,15 +277,19 @@ export function StatCard({
 		<Card
 			className={cn(
 				'group overflow-hidden pt-0',
-				'border-border/50 hover:border-primary/20',
+				'border-border/50 hover:border-primary/30',
 				'bg-card',
+				'transition-all duration-300 ease-out',
+				'hover:shadow-lg hover:-translate-y-1',
+				'animate-in fade-in slide-in-from-bottom-2',
 				getVariantClasses(),
 				className
 			)}
 			id={id}
 		>
 			<div className="relative p-3 sm:p-4">
-				<div className="absolute inset-0 bg-gradient-to-br from-primary/[0.02] to-transparent opacity-0 group-hover:opacity-100" />
+				<div className="absolute inset-0 bg-gradient-to-br from-primary/[0.05] via-primary/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+				<div className="absolute inset-0 bg-gradient-mesh opacity-0 group-hover:opacity-50 transition-opacity duration-700" />
 
 				<div className="relative z-10 space-y-1.5 sm:space-y-2">
 					<div className="flex items-start justify-between">
@@ -298,7 +302,10 @@ export function StatCard({
 							</div>
 							<div
 								className={cn(
-									'font-bold text-foreground leading-tight group-hover:text-primary',
+									'font-bold text-foreground leading-tight',
+									'transition-all duration-300',
+									'group-hover:text-primary group-hover:scale-105',
+									'transform-gpu',
 									isTimeValue
 										? 'text-base sm:text-lg md:text-xl'
 										: 'text-lg sm:text-xl md:text-2xl',
@@ -311,8 +318,8 @@ export function StatCard({
 							</div>
 						</div>
 						{Icon && (
-							<div className="ml-1.5 flex-shrink-0 rounded-lg bg-primary/5 p-1 group-hover:bg-primary/10 sm:ml-2 sm:p-1.5">
-								<Icon className="h-3 w-3 text-primary/70 group-hover:text-primary sm:h-4 sm:w-4" />
+							<div className="ml-1.5 flex-shrink-0 rounded-lg bg-primary/5 p-1 group-hover:bg-primary/10 sm:ml-2 sm:p-1.5 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3">
+								<Icon className="h-3 w-3 text-primary/70 group-hover:text-primary sm:h-4 sm:w-4 transition-all duration-300" />
 							</div>
 						)}
 					</div>

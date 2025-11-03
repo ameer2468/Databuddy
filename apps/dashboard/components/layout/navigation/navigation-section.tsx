@@ -141,24 +141,24 @@ export const NavigationSection = memo(function NavigationSectionComponent({
 	return (
 		<div className="border-sidebar-border/30 border-b border-dotted last:border-b-0">
 			<button
-				className="flex w-full items-center gap-3 px-3 py-2.5 text-left font-medium text-sidebar-foreground text-sm transition-colors hover:bg-sidebar-accent/50 focus:outline-none"
+				className="flex w-full items-center gap-3 px-3 py-2.5 text-left font-medium text-sidebar-foreground text-sm transition-all duration-200 hover:bg-sidebar-accent/50 hover:pl-4 focus:outline-none group"
 				data-section={title}
 				data-track="navigation-section-toggle"
 				onClick={() => toggleAccordion(title, true)}
 				type="button"
 			>
 				<Icon
-					className="size-5 flex-shrink-0 text-sidebar-ring"
+					className="size-5 flex-shrink-0 text-sidebar-ring transition-transform duration-200 group-hover:scale-110"
 					weight="fill"
 				/>
-				<span className="flex-1 text-sm">{title}</span>
+				<span className="flex-1 text-sm transition-colors duration-200 group-hover:text-sidebar-primary-foreground">{title}</span>
 				<motion.div
 					animate={{ rotate: isExpanded ? 180 : 0 }}
 					className="flex-shrink-0"
 					transition={{ duration: 0.2 }}
 				>
 					<CaretDownIcon
-						className="h-4 w-4 text-sidebar-foreground/60"
+						className="h-4 w-4 text-sidebar-foreground/60 transition-colors duration-200 group-hover:text-sidebar-ring"
 						weight="duotone"
 					/>
 				</motion.div>

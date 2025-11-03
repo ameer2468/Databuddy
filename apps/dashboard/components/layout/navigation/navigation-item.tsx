@@ -116,10 +116,10 @@ export function NavigationItem({
 			aria-current={isActive ? 'page' : undefined}
 			aria-label={`${name}${isExternal ? ' (opens in new tab)' : ''}`}
 			className={cn(
-				'group flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
+				'group flex items-center gap-3 px-4 py-2.5 text-sm transition-all duration-200 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground hover:pl-5',
 				isActive
-					? 'border-sidebar-ring border-r-2 bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-					: 'text-sidebar-foreground/70'
+					? 'border-sidebar-ring border-r-2 bg-sidebar-accent font-medium text-sidebar-accent-foreground shadow-sm'
+					: 'text-sidebar-foreground/70 hover:shadow-sm'
 			)}
 			data-nav-href={href}
 			data-nav-item={name}

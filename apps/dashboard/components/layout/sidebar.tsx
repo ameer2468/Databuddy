@@ -235,7 +235,7 @@ export function Sidebar() {
 
 			{isMobileOpen && (
 				<div
-					className="fixed inset-0 z-30 bg-black/20 md:hidden"
+					className="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200 md:hidden"
 					onClick={closeSidebar}
 					onKeyDown={(e) => {
 						if (e.key === 'Escape') {
@@ -251,7 +251,8 @@ export function Sidebar() {
 				aria-hidden={!isMobileOpen}
 				className={cn(
 					'fixed inset-y-0 z-40 w-56 sm:w-60 md:w-64 lg:w-72 bg-sidebar',
-					'border-sidebar-border border-r transition-transform duration-200 ease-out',
+					'border-sidebar-border border-r transition-all duration-300 ease-out',
+					'shadow-xl md:shadow-lg',
 					'left-0 md:left-12',
 					'pt-12 md:pt-0',
 					'md:translate-x-0',
