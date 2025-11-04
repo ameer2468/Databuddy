@@ -1,6 +1,7 @@
 import { Footer } from '@/components/footer';
 import { Description } from '@/components/landing/description';
 import FAQ from '@/components/landing/faq';
+import { FeaturesBento } from '@/components/landing/features-bento';
 import { GridCards } from '@/components/landing/grid-cards';
 import Hero from '@/components/landing/hero';
 import Section from '@/components/landing/section';
@@ -72,6 +73,16 @@ export default function HomePage() {
 				>
 					<div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
 						<TrustedBy />
+					</div>
+				</Section>
+
+				{/* Features Bento Grid Section */}
+				<Section
+					className="border-border border-b bg-background/30 py-16 lg:py-24"
+					id="features"
+				>
+					<div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+						<FeaturesBento />
 					</div>
 				</Section>
 
