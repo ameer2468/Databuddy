@@ -82,6 +82,7 @@
     "recharts": "^2.15.4",
     "rehype-katex": "^7.0.1",
     "remark-math": "^6.0.0",
+    "server-only": "^0.0.1",
     "shiki": "^3.13.0",
     "sonner": "catalog:",
     "streamdown": "^1.4.0",
