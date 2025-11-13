@@ -16,7 +16,6 @@ import { METRIC_COLORS, METRICS } from "@/components/charts/metrics-constants";
 import { Button } from "@/components/ui/button";
 import { ErrorChartTooltip } from "./error-chart-tooltip";
 
-// Dynamically import chart components for better performance
 const ResponsiveContainer = dynamic(
 	() => import("recharts").then((mod) => mod.ResponsiveContainer),
 	{ ssr: false }
