@@ -4,7 +4,6 @@ import { and, desc, eq, flags, isNull } from "@databuddy/db";
 import { createDrizzleCache, redis } from "@databuddy/redis";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
-import { logger } from "../lib/logger";
 import type { Context } from "../orpc";
 import { protectedProcedure, publicProcedure } from "../orpc";
 import { authorizeWebsiteAccess } from "../utils/auth";
@@ -177,7 +176,12 @@ export const flagsRouter = {
 			ttl: CACHE_DURATION,
 			tables: ["flags"],
 			queryFn: async () => {
-				await authorizeScope(context, input.websiteId, input.organizationId, "read");
+				await authorizeScope(
+					context,
+					input.websiteId,
+					input.organizationId,
+					"read"
+				);
 
 				const conditions = [
 					isNull(flags.deletedAt),
@@ -208,7 +212,12 @@ export const flagsRouter = {
 				ttl: CACHE_DURATION,
 				tables: ["flags"],
 				queryFn: async () => {
-					await authorizeScope(context, input.websiteId, input.organizationId, "read");
+					await authorizeScope(
+						context,
+						input.websiteId,
+						input.organizationId,
+						"read"
+					);
 
 					const result = await context.db
 						.select()
@@ -244,7 +253,12 @@ export const flagsRouter = {
 				ttl: CACHE_DURATION,
 				tables: ["flags"],
 				queryFn: async () => {
-					await authorizeScope(context, input.websiteId, input.organizationId, "read");
+					await authorizeScope(
+						context,
+						input.websiteId,
+						input.organizationId,
+						"read"
+					);
 
 					const result = await context.db
 						.select()
@@ -326,17 +340,6 @@ export const flagsRouter = {
 
 				await flagsCache.invalidateByTables(["flags"]);
 
-				logger.info(
-					{
-						flagId: restoredFlag.id,
-						key: input.key,
-						websiteId: input.websiteId,
-						organizationId: input.organizationId,
-						userId: context.user.id,
-					},
-					"Flag restored from soft-delete"
-				);
-
 				return restoredFlag;
 			}
 
@@ -362,17 +365,6 @@ export const flagsRouter = {
 				.returning();
 
 			await flagsCache.invalidateByTables(["flags"]);
-
-			logger.info(
-				{
-					flagId: newFlag.id,
-					key: input.key,
-					websiteId: input.websiteId,
-					organizationId: input.organizationId,
-					userId: context.user.id,
-				},
-				"Flag created"
-			);
 
 			return newFlag;
 		}),
@@ -422,16 +414,6 @@ export const flagsRouter = {
 
 			await invalidateFlagCache(id, flag.websiteId, flag.organizationId);
 
-			logger.info(
-				{
-					flagId: id,
-					websiteId: flag.websiteId,
-					organizationId: flag.organizationId,
-					userId: context.user.id,
-				},
-				"Flag updated"
-			);
-
 			return updatedFlag;
 		}),
 
@@ -477,16 +459,6 @@ export const flagsRouter = {
 				.where(and(eq(flags.id, input.id), isNull(flags.deletedAt)));
 
 			await invalidateFlagCache(input.id, flag.websiteId, flag.organizationId);
-
-			logger.info(
-				{
-					flagId: input.id,
-					websiteId: flag.websiteId,
-					organizationId: flag.organizationId,
-					userId: context.user.id,
-				},
-				"Flag deleted"
-			);
 
 			return { success: true };
 		}),
