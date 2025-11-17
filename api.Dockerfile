@@ -20,6 +20,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api ./apps/api
 COPY --from=builder /app/packages ./packages
 
+ENV NODE_ENV=production
+
 EXPOSE 4000
 
 WORKDIR /app/apps/api
