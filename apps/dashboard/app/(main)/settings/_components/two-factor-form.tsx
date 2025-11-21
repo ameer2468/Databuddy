@@ -30,6 +30,7 @@ import {
 	FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { NoticeBanner } from "../../websites/_components/notice-banner";
 
 const setupFormDefaultValues = {
 	password: "",
@@ -520,14 +521,11 @@ export function TwoFactorForm() {
 				</>
 			) : (
 				<>
-					<Alert>
-						<ShieldCheckIcon className="h-4 w-4" size={16} weight="duotone" />
-						<AlertTitle>Add an extra layer of security</AlertTitle>
-						<AlertDescription>
-							Two-factor authentication adds an additional layer of security to
-							your account by requiring more than just a password to sign in.
-						</AlertDescription>
-					</Alert>
+					<NoticeBanner
+						icon={<ShieldCheckIcon className="size-4" weight="duotone" />}
+						title="	Two-factor authentication adds an additional layer of security to
+						your account by requiring more than just a password to sign in."
+					/>
 
 					<Form {...setupForm}>
 						<form

@@ -15,6 +15,8 @@ import { WebsiteDialog } from "@/components/website-dialog";
 import { useWebsites } from "@/hooks/use-websites";
 
 import { cn } from "@/lib/utils";
+import { NoticeBanner } from "./_components/notice-banner";
+import { PageHeader } from "./_components/page-header";
 import { WebsiteCard } from "./_components/website-card";
 
 function LoadingSkeleton() {
@@ -94,39 +96,24 @@ export default function WebsitesPage() {
 	return (
 		<div className="flex h-full flex-col">
 			{/* Enhanced header */}
-			<div className="border-b">
-				<div className="flex flex-col justify-between gap-3 p-3 sm:flex-row sm:items-center sm:gap-0 sm:px-4 sm:py-4">
-					<div className="min-w-0 flex-1">
-						<div className="flex items-center gap-3">
-							<div className="rounded-lg border border-primary/20 bg-primary/10 p-2">
-								<TrendUpIcon
-									aria-hidden="true"
-									className="h-5 w-5 text-primary"
-									size={24}
-									weight="fill"
-								/>
-							</div>
-							<div className="min-w-0 flex-1">
-								<h1 className="truncate font-bold text-foreground text-xl tracking-tight sm:text-2xl">
-									Websites
-								</h1>
-								<p className="mt-0.5 text-muted-foreground text-xs sm:text-sm">
-									Track analytics for all your websites
-								</p>
-							</div>
-						</div>
-					</div>
-					<div className="flex items-center gap-2">
+			<PageHeader
+				description="Track analytics for all your websites"
+				icon={<TrendUpIcon />}
+				right={
+					<>
 						<Button
 							aria-label="Refresh websites"
 							disabled={isLoading || isFetching}
 							onClick={() => refetch()}
 							size="icon"
-							variant="outline"
+							variant="secondary"
 						>
 							<ArrowClockwiseIcon
 								aria-hidden
-								className={`h-4 w-4 ${isLoading || isFetching ? "animate-spin" : ""}`}
+								className={cn(
+									"size-4",
+									isLoading || isFetching ? "animate-spin" : ""
+								)}
 							/>
 						</Button>
 						<Button
@@ -141,13 +128,14 @@ export default function WebsitesPage() {
 							onClick={() => setDialogOpen(true)}
 							size="default"
 						>
-							<div className="absolute inset-0 translate-x-[-100%] bg-linear-to-r from-white/0 via-white/20 to-white/0 transition-transform duration-700 group-hover:translate-x-[100%]" />
+							<div className="-translate-x-full absolute inset-0 bg-linear-to-r from-white/0 via-white/20 to-white/0 transition-transform duration-700 group-hover:translate-x-full" />
 							<PlusIcon className="relative z-10 h-4 w-4 transition-transform duration-300 group-hover:rotate-90" />
 							<span className="relative z-10 truncate">New Website</span>
 						</Button>
-					</div>
-				</div>
-			</div>
+					</>
+				}
+				title="Websites"
+			/>
 
 			{/* Content area */}
 			<div
@@ -156,23 +144,11 @@ export default function WebsitesPage() {
 			>
 				{/* Website count indicator */}
 				{!isLoading && websites && websites.length > 0 && (
-					<div className="mb-6">
-						<div className="flex items-center gap-2 rounded-lg border border-muted bg-muted/30 px-3 py-2 text-muted-foreground text-sm">
-							<GlobeIcon
-								aria-hidden="true"
-								className="h-4 w-4 shrink-0"
-								size={24}
-								weight="duotone"
-							/>
-							<span className="truncate">
-								Tracking{" "}
-								<span className="font-medium text-foreground">
-									{websites.length}
-								</span>{" "}
-								website{websites.length !== 1 ? "s" : ""}
-							</span>
-						</div>
-					</div>
+					<NoticeBanner
+						className="mb-6"
+						icon={<GlobeIcon />}
+						title={`Tracking ${websites.length} website${websites.length !== 1 ? "s" : ""}`}
+					/>
 				)}
 
 				{/* Show loading state */}
